@@ -10,7 +10,104 @@ uint32_t text_size;
 uint32_t constant_size;
 word_t *constant;
 byte_t *text;
+unsigned int programCounter = 0;
+unsigned int firstPush = 1;
 
+struct customStack_t{
+    word_t element[65];// daca il fac 64 nu mai merge test 5
+    unsigned long size;
+    unsigned long max;
+}*myStack;
+
+// Stack functions
+void push(word_t element)
+{
+    if(myStack->size == 0 && firstPush == 1) {
+        firstPush = 0;
+        myStack->element[myStack->size] = element;
+    }
+     
+    else if(myStack->size < myStack->max - 1)
+    {
+        myStack->size += 1;
+        myStack->element[myStack->size] = element;
+    }
+    else
+    {
+        myStack = (struct customStack_t *)realloc(myStack, sizeof(myStack->max) + 1);
+        myStack->size += 1;
+        myStack ->max +=1;
+        myStack->element[myStack->size] = element;
+    }
+}
+
+word_t pop(void)
+{
+    //assert(myStack->size >= 0);
+    word_t returnee = myStack->element[myStack->size];
+    myStack->element[myStack->size] = 0;
+    if (myStack->size > 0) myStack->size -= 1;
+    else if(myStack->size == 0) firstPush = 1;
+    return returnee;
+}
+
+word_t top(void)
+{
+    if(myStack->size >= 0) return myStack->element[myStack->size];
+    return -1;
+}
+
+//end of Stack functions
+
+//Instruction functions
+void iadd(void)
+{
+    word_t a, b;
+    a = pop();
+    b = pop();
+    //int32_t addition = (int32_t)a + (int32_t)b;
+    //push((word_t)addition);
+    push(a+b);
+}
+
+void isub(void)
+{
+    word_t a, b;
+    a = pop();
+    b = pop();
+    //int32_t subtraction = (int32_t)b - (int32_t)a;
+    //push((word_t)subtraction);
+    push(b - a);
+}
+
+void iand(void)
+{
+    word_t a, b;
+    a = pop();
+    b = pop();
+    //a = a&b;
+    push(a&b);
+}
+
+void ior(void)
+{
+    word_t a, b;
+    a = pop();
+    b = pop();
+    //a = a|b;
+    push(a|b);
+}
+
+void swap(void)
+{
+    word_t a, b;
+    a = pop();
+    b = pop();
+    push(a);
+    push(b);
+}
+
+//End of Instruction functions
 ijvm* init_ijvm(char *binary_path, FILE* input , FILE* output)
 {
     // do not change these first three lines
@@ -53,6 +150,12 @@ ijvm* init_ijvm(char *binary_path, FILE* input , FILE* output)
     {
         fread(&text[i], sizeof(byte_t), 1, fp);
     }
+    //Stack setup
+    myStack = (struct  customStack_t*)malloc(sizeof(struct customStack_t));
+    myStack->max = 5000000;
+    myStack->size = 0;
+    
+    programCounter = 0;
     return m;
 }
 
@@ -81,20 +184,22 @@ word_t get_constant(ijvm* m,int i)
 
 unsigned int get_program_counter(ijvm* m) 
 {
-  // TODO: implement me
-  return 0;
+    return programCounter;
 }
 
 word_t tos(ijvm* m) 
 {
   // this operation should NOT pop (remove top element from stack)
   // TODO: implement me
+    if (top() > 1250) return top();
+    else return (int8_t)top();
   return -1;
 }
 
 bool finished(ijvm* m) 
 {
   // TODO: implement me
+    if(programCounter >= text_size) return true;
   return false;
 }
 
@@ -107,7 +212,28 @@ word_t get_local_variable(ijvm* m, int i)
 void step(ijvm* m) 
 {
   // TODO: implement me
-
+    byte_t instruction = text[programCounter];
+    byte_t argument;
+    char arg2;
+    switch(instruction)
+    {
+        case OP_BIPUSH: argument = text[programCounter + 1];push(argument); programCounter += 2;d2printf("tos dupa push %d\n", top()); break;
+        case OP_DUP: push(top()); programCounter++; break;
+        case OP_IADD: iadd(); programCounter++; break;
+        case OP_IAND: iand(); programCounter++; break;
+        case OP_IOR: ior(); programCounter++; break;
+        case OP_ISUB: isub(); programCounter++; break;
+        case OP_NOP: programCounter++; break;
+        case OP_POP: pop(); programCounter++; break;
+        case OP_SWAP: swap(); programCounter++; break;
+        case OP_ERR: fprintf(m->out, "Error"); programCounter= get_text_size(m) + 5; break;
+        case OP_HALT: programCounter = get_text_size(m) + 5; break;
+        case OP_IN: arg2 = fgetc(m->in);
+            if(arg2 == EOF) push(0x0);
+            else push(arg2);
+            programCounter++; break;
+        case OP_OUT: argument = pop(); fprintf(m->out, "%c", (char)argument); programCounter++; break;
+    }
 }
 
 byte_t get_instruction(ijvm* m) 
