@@ -1,0 +1,34 @@
+.constant
+.end-constant
+
+.main
+	NOP
+	IN 
+	IN 
+	DUP
+	DUP
+	DUP
+	DUP
+	IN
+	DUP
+	BIPUSH 0x3
+	IADD
+	OUT
+	IADD
+	DUP
+	OUT
+	SWAP
+	ISUB
+	SWAP
+	ISUB
+	DUP
+	OUT
+	IADD
+	BIPUSH 0xA
+	ISUB
+	IADD
+	IADD
+	OUT
+	NOP
+  HALT
+.end-main

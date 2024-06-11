@@ -6,45 +6,77 @@
 
 // see ijvm.h for descriptions of the below functions
 
-ijvm* init_ijvm(char *binary_path, FILE* input , FILE* output) 
-{
-  // do not change these first three lines
-  ijvm* m = (ijvm *) malloc(sizeof(ijvm));
-  // note that malloc gives you memory, but gives no guarantees on the initial
-  // values of that memory. It might be all zeroes, or be random data.
-  // It is hence important that you initialize all variables in the ijvm
-  // struct and do not assume these are set to zero.
-  m->in = input;
-  m->out = output;
-  
-  // TODO: implement me
+uint32_t text_size;
+uint32_t constant_size;
+word_t *constant;
+byte_t *text;
 
-  return m;
+ijvm* init_ijvm(char *binary_path, FILE* input , FILE* output)
+{
+    // do not change these first three lines
+    ijvm* m = (ijvm *) malloc(sizeof(ijvm));
+    // note that malloc gives you memory, but gives no guarantees on the initial
+    // values of that memory. It might be all zeroes, or be random data.
+    // It is hence important that you initialize all variables in the ijvm
+    // struct and do not assume these are set to zero.
+    m->in = input;
+    m->out = output;
+    
+    FILE *fp = fopen(binary_path, "rb");
+    
+    uint32_t magicNumber;
+    fread(&magicNumber, sizeof(uint32_t), 1, fp);
+    magicNumber = swap_uint32(magicNumber);
+    if(magicNumber != 0x1DEADFAD) {return NULL;}
+    
+    fseek(fp, 4, SEEK_CUR);
+       
+    fread(&constant_size, sizeof(uint32_t), 1, fp);
+    constant_size = swap_uint32(constant_size);
+       
+    constant = (word_t *)malloc(sizeof(word_t) * constant_size);
+       
+    for(int i = 0; i < constant_size; i++)
+    {
+        fread(&constant[i], sizeof(word_t), 1, fp);
+        constant[i] = swap_uint32(constant[i]);
+    }
+       
+    fseek(fp, constant_size + 16, SEEK_SET);
+
+    fread(&text_size, sizeof(uint32_t), 1, fp);
+    text_size = swap_uint32(text_size);
+       
+    text = (byte_t *)malloc(sizeof(byte_t) * text_size);
+       
+    for(int i = 0; i < text_size; i++)
+    {
+        fread(&text[i], sizeof(byte_t), 1, fp);
+    }
+    return m;
 }
 
 void destroy_ijvm(ijvm* m) 
 {
-  // TODO: implement me
-
-  free(m); // free memory for struct
+    free(text);
+    free(constant);
+    free(m);
 }
 
 byte_t *get_text(ijvm* m) 
 {
-  // TODO: implement me
-  return NULL;
+    return (byte_t *)text;
 }
 
 unsigned int get_text_size(ijvm* m) 
 {
-  // TODO: implement me
-  return 0;
+    return text_size;
 }
 
 word_t get_constant(ijvm* m,int i) 
 {
-  // TODO: implement me
-  return 0;
+    return constant[i];
+    return 0;
 }
 
 unsigned int get_program_counter(ijvm* m) 
