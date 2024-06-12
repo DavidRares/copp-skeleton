@@ -107,6 +107,32 @@ void swap(void)
     push(b);
 }
 
+void branch(byte_t instruction , byte_t argument)
+{
+    short address;
+    byte_t arg2 = text[programCounter + 2];
+    address = argument * 0x100u + arg2;
+    word_t compElement = pop();
+    
+    switch(instruction)
+    {
+        case OP_GOTO: push(compElement); programCounter += (int16_t)address; break;
+        case OP_IFEQ: if(compElement == 0)
+            programCounter += address;
+        else programCounter += 3;
+        break;
+        case OP_IFLT: d2printf("drept bit %02x && ca numar int8 %d && drept int16 %d\n",compElement,(int8_t)compElement,(int16_t)compElement);
+            if(compElement < 0) programCounter += address;
+            else programCounter +=3;
+        break;
+        case OP_IF_ICMPEQ: if(compElement == pop())
+            programCounter += address;
+        else programCounter += 3;
+        break;
+        default: break;
+    }
+}
+
 //End of Instruction functions
 ijvm* init_ijvm(char *binary_path, FILE* input , FILE* output)
 {
@@ -189,11 +215,8 @@ unsigned int get_program_counter(ijvm* m)
 
 word_t tos(ijvm* m) 
 {
-  // this operation should NOT pop (remove top element from stack)
-  // TODO: implement me
-    if (top() > 1250) return top();
-    else return (int8_t)top();
-  return -1;
+    return top();
+    return -1;
 }
 
 bool finished(ijvm* m) 
@@ -213,11 +236,11 @@ void step(ijvm* m)
 {
   // TODO: implement me
     byte_t instruction = text[programCounter];
-    byte_t argument;
+    int8_t argument;
     char arg2;
     switch(instruction)
     {
-        case OP_BIPUSH: argument = text[programCounter + 1];push(argument); programCounter += 2;d2printf("tos dupa push %d\n", top()); break;
+        case OP_BIPUSH: argument = text[programCounter + 1];push(argument); programCounter += 2; break;
         case OP_DUP: push(top()); programCounter++; break;
         case OP_IADD: iadd(); programCounter++; break;
         case OP_IAND: iand(); programCounter++; break;
@@ -233,6 +256,10 @@ void step(ijvm* m)
             else push(arg2);
             programCounter++; break;
         case OP_OUT: argument = pop(); fprintf(m->out, "%c", (char)argument); programCounter++; break;
+        case OP_GOTO:
+        case OP_IFEQ:
+        case OP_IFLT:
+        case OP_IF_ICMPEQ: argument = text[programCounter + 1];branch(instruction, argument); break;
     }
 }
 

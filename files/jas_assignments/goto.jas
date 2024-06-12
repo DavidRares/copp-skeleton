@@ -1,0 +1,9 @@
+.constant
+.end-constant
+
+.main
+	NOP
+	
+	NOP
+  HALT
+.end-main
