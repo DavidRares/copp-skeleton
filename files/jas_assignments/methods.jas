@@ -1,0 +1,39 @@
+.constant
+    objref  0xCAFE  // may be any value.  Needed by invokevirtual.
+.end-constant
+
+.main
+	LDC_W objref
+	IN
+	INVOKEVIRTUAL is_even
+	OUT
+	HALT
+.end-main
+.method is_even(var)
+	ILOAD var
+	IFEQ ZERO
+	ILOAD var
+	BIPUSH 0x1
+	ISUB
+	LDC_W objref
+	SWAP
+	INVOKEVIRTUAL is_odd
+	IRETURN
+ZERO:
+	BIPUSH 0x54
+	IRETURN
+.end-method
+.method is_odd(var)
+	ILOAD var
+	IFEQ NULL
+	ILOAD var
+	BIPUSH 0x1
+	ISUB
+	LDC_W objref
+	SWAP
+	INVOKEVIRTUAL is_even
+	IRETURN
+NULL:
+	BIPUSH 0x46
+	IRETURN
+.end-method

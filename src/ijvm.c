@@ -5,13 +5,17 @@
 
 
 // see ijvm.h for descriptions of the below functions
-
+ijvm* m;
 uint32_t text_size;
 uint32_t constant_size;
 word_t *constant;
 byte_t *text;
 unsigned int programCounter = 0;
 unsigned int firstPush = 1;
+unsigned int activeMethods = 0;
+word_t *lv;
+word_t *sp;
+word_t prevLV;
 
 struct customStack_t{
     word_t element[65];// daca il fac 64 nu mai merge test 5
@@ -31,6 +35,7 @@ void push(word_t element)
     {
         myStack->size += 1;
         myStack->element[myStack->size] = element;
+        sp = &myStack->element[myStack->size];
     }
     else
     {
@@ -38,6 +43,7 @@ void push(word_t element)
         myStack->size += 1;
         myStack ->max +=1;
         myStack->element[myStack->size] = element;
+        sp = &myStack->element[myStack->size];
     }
 }
 
@@ -48,15 +54,9 @@ word_t pop(void)
     myStack->element[myStack->size] = 0;
     if (myStack->size > 0) myStack->size -= 1;
     else if(myStack->size == 0) firstPush = 1;
+    sp = &myStack->element[myStack->size];
     return returnee;
 }
-
-word_t top(void)
-{
-    if(myStack->size >= 0) return myStack->element[myStack->size];
-    return -1;
-}
-
 //end of Stack functions
 
 //Instruction functions
@@ -65,9 +65,7 @@ void iadd(void)
     word_t a, b;
     a = pop();
     b = pop();
-    //int32_t addition = (int32_t)a + (int32_t)b;
-    //push((word_t)addition);
-    push(a+b);
+    push(a + b);
 }
 
 void isub(void)
@@ -75,8 +73,6 @@ void isub(void)
     word_t a, b;
     a = pop();
     b = pop();
-    //int32_t subtraction = (int32_t)b - (int32_t)a;
-    //push((word_t)subtraction);
     push(b - a);
 }
 
@@ -94,7 +90,6 @@ void ior(void)
     word_t a, b;
     a = pop();
     b = pop();
-    //a = a|b;
     push(a|b);
 }
 
@@ -121,17 +116,18 @@ void branch(byte_t instruction , byte_t argument)
             programCounter += address;
         else programCounter += 3;
         break;
-        case OP_IFLT: d2printf("drept bit %02x && ca numar int8 %d && drept int16 %d\n",compElement,(int8_t)compElement,(int16_t)compElement);
+        case OP_IFLT:
             if(compElement < 0) programCounter += address;
             else programCounter +=3;
         break;
-        case OP_IF_ICMPEQ: if(compElement == pop())
-            programCounter += address;
-        else programCounter += 3;
+        case OP_IF_ICMPEQ: 
+            if(compElement == pop()) programCounter += address;
+            else programCounter += 3;
         break;
         default: break;
     }
 }
+
 
 //End of Instruction functions
 ijvm* init_ijvm(char *binary_path, FILE* input , FILE* output)
@@ -180,12 +176,22 @@ ijvm* init_ijvm(char *binary_path, FILE* input , FILE* output)
     myStack = (struct  customStack_t*)malloc(sizeof(struct customStack_t));
     myStack->max = 5000000;
     myStack->size = 0;
-    
+    lv = &myStack->element[0];
+    prevLV = 0;
+    activeMethods = 0;
     programCounter = 0;
     return m;
 }
 
-void destroy_ijvm(ijvm* m) 
+void push_constant(byte_t argument)
+{
+    byte_t arg2 = (word_t)text[programCounter + 2];
+    short index = argument * 0x100u + arg2;
+    push(get_constant(m, index));
+    sp = &myStack->element[myStack->size];
+}
+
+void destroy_ijvm(ijvm* m)
 {
     free(text);
     free(constant);
@@ -215,7 +221,7 @@ unsigned int get_program_counter(ijvm* m)
 
 word_t tos(ijvm* m) 
 {
-    return top();
+    if(myStack->size >= 0) return myStack->element[myStack->size];
     return -1;
 }
 
@@ -228,8 +234,7 @@ bool finished(ijvm* m)
 
 word_t get_local_variable(ijvm* m, int i) 
 {
-  // TODO: implement me
-  return 0;
+    return 0;
 }
 
 void step(ijvm* m) 
@@ -241,7 +246,7 @@ void step(ijvm* m)
     switch(instruction)
     {
         case OP_BIPUSH: argument = text[programCounter + 1];push(argument); programCounter += 2; break;
-        case OP_DUP: push(top()); programCounter++; break;
+        case OP_DUP: push(tos(m)); programCounter++; break;
         case OP_IADD: iadd(); programCounter++; break;
         case OP_IAND: iand(); programCounter++; break;
         case OP_IOR: ior(); programCounter++; break;
@@ -260,6 +265,16 @@ void step(ijvm* m)
         case OP_IFEQ:
         case OP_IFLT:
         case OP_IF_ICMPEQ: argument = text[programCounter + 1];branch(instruction, argument); break;
+        case OP_LDC_W: argument = text[programCounter + 1];push_constant(argument);programCounter += 3; break;
+//        case OP_ILOAD: argument = text[programCounter + 1];
+//            if(activeMethods == 0) {push(*(lv + argument - 1));}
+//            else {push(*(lv + argument));}
+//            programCounter +=2; break;
+//        case OP_ISTORE: argument = text[programCounter + 1]; 
+//            if(activeMethods == 0) {*(lv + argument - 1) = pop();}
+//            else {*(lv + argument) = pop();}
+//            programCounter += 2; break;
+//        
     }
 }
 

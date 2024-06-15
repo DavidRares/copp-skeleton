@@ -1,0 +1,39 @@
+.constant
+
+.end-constant
+
+.main
+	.var
+	x
+	y
+	z
+	.end-var
+	NOP
+	IN
+	IN
+	IN
+	ISTORE z
+	ISTORE y
+	ISTORE x
+	ILOAD x
+	BIPUSH 0x3
+	IADD
+	OUT
+	ILOAD x
+	ILOAD z
+	IADD
+	OUT
+	ILOAD z
+	ILOAD y
+	ISUB
+	OUT
+	ILOAD x
+	ILOAD y
+	ILOAD z
+	IADD
+	IADD
+	BIPUSH 0xA
+	ISUB
+	OUT
+	HALT
+.end-main
