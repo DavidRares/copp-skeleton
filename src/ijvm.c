@@ -9,6 +9,7 @@ ijvm* m;
 uint32_t text_size;
 uint32_t constant_size;
 word_t *constant;
+word_t *local_variables;
 byte_t *text;
 unsigned int programCounter = 0;
 unsigned int firstPush = 1;
@@ -128,8 +129,41 @@ void branch(byte_t instruction , byte_t argument)
     }
 }
 
+void iirc(byte_t argument)
+{
+    byte_t argument2 = text[programCounter + 2];
+    int32_t argument2_conv = argument2;
+    if (argument2_conv >= 128) { argument2_conv -= 256;}
+    local_variables[argument] += (word_t)argument2_conv;
+    //d2printf("local variable after %02x and argument2 = %d\n",local_variables[argument],(byte_t)argument2_conv);
+}
 
+void wide_iirc(word_t address)
+{
+    byte_t increment = text[programCounter + 4];
+    int32_t increment_conv = increment;
+    if (increment_conv >= 128) { increment_conv -= 256;}
+    if(lv == &myStack->element[0] && activeMethods == 0) local_variables[address] += (word_t)increment_conv;
+    else lv[address] += (word_t)increment_conv;
+    programCounter++;
+    //d2printf("local variable after %02x and argument2 = %d\n",local_variables[argument],(byte_t)argument2_conv);
+}
+
+void wide_instructions(byte_t instruction)
+{
+    byte_t part1 = text[programCounter + 2];
+    byte_t part2 = text[programCounter + 3];
+    int32_t address = part1 * 0x100u + part2;
+    
+    switch(instruction)
+    {
+        case OP_ILOAD: if(lv == &myStack->element[0] && activeMethods == 0) push(local_variables[address]); else push(lv[address]); break;
+        case OP_ISTORE: if(lv == &myStack->element[0] && activeMethods == 0) local_variables[address] = pop();else lv[address] = pop(); break;
+        case OP_IINC: wide_iirc(address);break;
+    }
+}
 //End of Instruction functions
+
 ijvm* init_ijvm(char *binary_path, FILE* input , FILE* output)
 {
     // do not change these first three lines
@@ -154,7 +188,8 @@ ijvm* init_ijvm(char *binary_path, FILE* input , FILE* output)
     constant_size = swap_uint32(constant_size);
        
     constant = (word_t *)malloc(sizeof(word_t) * constant_size);
-       
+    local_variables = (word_t *)malloc(sizeof(word_t) * 256);
+    
     for(int i = 0; i < constant_size; i++)
     {
         fread(&constant[i], sizeof(word_t), 1, fp);
@@ -178,8 +213,8 @@ ijvm* init_ijvm(char *binary_path, FILE* input , FILE* output)
     myStack->size = 0;
     lv = &myStack->element[0];
     prevLV = 0;
-    activeMethods = 0;
     programCounter = 0;
+    activeMethods = 0;
     return m;
 }
 
@@ -196,6 +231,8 @@ void destroy_ijvm(ijvm* m)
     free(text);
     free(constant);
     free(m);
+    free(local_variables);
+    free(myStack);
 }
 
 byte_t *get_text(ijvm* m) 
@@ -234,6 +271,11 @@ bool finished(ijvm* m)
 
 word_t get_local_variable(ijvm* m, int i) 
 {
+    if (lv == &myStack->element[0] && activeMethods == 0) return local_variables[i];
+    else
+    {
+        return *(lv + i);
+    }
     return 0;
 }
 
@@ -266,15 +308,21 @@ void step(ijvm* m)
         case OP_IFLT:
         case OP_IF_ICMPEQ: argument = text[programCounter + 1];branch(instruction, argument); break;
         case OP_LDC_W: argument = text[programCounter + 1];push_constant(argument);programCounter += 3; break;
-//        case OP_ILOAD: argument = text[programCounter + 1];
-//            if(activeMethods == 0) {push(*(lv + argument - 1));}
-//            else {push(*(lv + argument));}
-//            programCounter +=2; break;
-//        case OP_ISTORE: argument = text[programCounter + 1]; 
-//            if(activeMethods == 0) {*(lv + argument - 1) = pop();}
-//            else {*(lv + argument) = pop();}
-//            programCounter += 2; break;
-//        
+        case OP_ILOAD: argument = text[programCounter + 1];
+            if(lv == &myStack->element[0] && activeMethods == 0) {push(local_variables[argument]);}
+            else
+            {
+                push(*(lv + argument));
+            }
+            programCounter +=2; break;
+        case OP_ISTORE: argument = text[programCounter + 1]; if(lv == &myStack->element[0] && activeMethods == 0) {local_variables[argument] = pop();}
+            else
+            {
+                *(lv + argument) = pop();
+            }
+            programCounter +=2; break;
+        case OP_IINC: argument = text[programCounter + 1];iirc(argument); programCounter += 3; break;
+        case OP_WIDE: argument = text[programCounter + 1];wide_instructions(argument); programCounter += 4;break;
     }
 }
 
