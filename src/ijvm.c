@@ -19,9 +19,9 @@ word_t *sp;
 word_t prevLV;
 
 struct customStack_t{
-    word_t element[65];// daca il fac 64 nu mai merge test 5
-    unsigned long size;
-    unsigned long max;
+    word_t element[1000000];// daca il fac 64 nu mai merge test 5
+    unsigned int size;
+    unsigned int max;
 }*myStack;
 
 // Stack functions
@@ -162,6 +162,41 @@ void wide_instructions(byte_t instruction)
         case OP_IINC: wide_iirc(address);break;
     }
 }
+
+void init_method(byte_t argument1 , byte_t argument2)
+{
+    short index = argument1 * 0x100u + argument2;
+    word_t address = constant[index];
+    word_t prevPC = programCounter;
+    programCounter = address + 4;
+    
+    short num_args = text[address] * 0x100u + text[address + 1];
+    int num_local_variables = text[address + 2] * 0x100u + text[address + 3];
+    
+    for(int i = 0 ;i < num_local_variables ; i++)
+    {push(0x0);
+    }
+    
+    push(prevPC);
+    push(prevLV);
+
+    lv = sp - 1 - num_args - num_local_variables;
+    prevLV = myStack->size - 1 - num_args - num_local_variables;
+    *lv = myStack->size - 1;
+    activeMethods++;
+}
+
+void return_method(void)
+{
+        word_t indexPrevPC = *lv;
+        programCounter = myStack->element[indexPrevPC] + 3;
+        word_t returnValue = *sp;
+        prevLV = myStack->element[indexPrevPC + 1];
+        while(lv < sp)  pop();
+        *lv = returnValue;
+        lv = &myStack->element[prevLV];
+        activeMethods -= 1;
+}
 //End of Instruction functions
 
 ijvm* init_ijvm(char *binary_path, FILE* input , FILE* output)
@@ -209,7 +244,7 @@ ijvm* init_ijvm(char *binary_path, FILE* input , FILE* output)
     }
     //Stack setup
     myStack = (struct  customStack_t*)malloc(sizeof(struct customStack_t));
-    myStack->max = 5000000;
+    myStack->max = 1000000;
     myStack->size = 0;
     lv = &myStack->element[0];
     prevLV = 0;
@@ -323,6 +358,9 @@ void step(ijvm* m)
             programCounter +=2; break;
         case OP_IINC: argument = text[programCounter + 1];iirc(argument); programCounter += 3; break;
         case OP_WIDE: argument = text[programCounter + 1];wide_instructions(argument); programCounter += 4;break;
+        case OP_INVOKEVIRTUAL: init_method(text[programCounter + 1], text[programCounter + 2]); break;
+        case OP_IRETURN: return_method(); //d2printf("return counter = %lld && active_methods = %d\n",return_counter, activeMethods);
+            break;
     }
 }
 
